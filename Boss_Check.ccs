@@ -1,0 +1,78 @@
+import asm65816
+
+/*
+This makes it so you must beat ALL boss enemies in a battle before all normal enemies die and the battle ends.
+Works perfectly to destroy all normal enemies in a boss fight when the last remaining boss is defeated.
+Does not affect normal enemy battles.
+Uses the "boss flag" in the enemy_config_table to determine which enemies constitute bosses.
+  
+  
+Created by Messianic with help from vittorio.
+*/
+
+//Located in KO_Target routine
+ROM[0xC27B2C] = {
+	JML (BossCheck)
+	NOP
+}
+BossCheck:
+	BEQ_a (NotBoss)
+//Set things up for leaving this hijack
+	PHA
+	PHX
+	PHY
+	JSL (Check_Alive_Bosses)	//Check boss battle
+	CMP_i (1)	//Boss present
+	BEQ_a (BossesRemain)
+	PLY
+	PLX
+	PLA
+	JML (0xC27B31)	//For when all bosses in battle are defeated
+BossesRemain:
+	LDA_i (0x0021)	//Death sound
+	JSL (0xC0ABE0)	//Play it
+	LDA_i (0x0021)	
+	JSL (0xC0ABE0)	//For some reason it needs to be done twice to make it actually sound when the very first boss in a multi boss fight is killed
+	PLY
+	PLX
+	PLA
+NotBoss:
+	JML (0xC27BED)	//Go here for normal enemies
+
+Check_Alive_Bosses:	//written by vittorio
+// Initialize Y and X in 0.
+    LDY_i(0x00)
+    LDX_i(0x00)
+// If there are no more enemies, return 0. If the enemy is unconscious, do one more loop. If the enemy is conscious and a boss, return 1.
+    Check_Alive_Bosses_loop:
+    CPX_i(0x0750)
+    BEQ_a(Check_Alive_Bosses_end)
+    LDA_x(0xA21C)
+    BEQ_a(Check_Alive_Bosses_end)
+    LDA_x(0xA239)
+    AND_i(0xFF)
+    CMP_i(0x01)
+    BEQ_a(Check_Alive_Bosses_inc)
+    CMP_i(0x02)
+    BEQ_a(Check_Alive_Bosses_inc)
+    LDA_x(0xA21C)
+    LDY_i(0x5E)
+    JSL(0xC09032)
+    LDY_i(0x00)
+    PHX
+    TAX
+	LDA_xl (0xD595DF)
+    PLX
+    AND_i(0xFF)
+    BEQ_a(Check_Alive_Bosses_inc)
+    LDY_i(0x01)
+    BRA_a(Check_Alive_Bosses_end)
+Check_Alive_Bosses_inc:
+    TXA
+    CLC
+    ADC_i(0x4E)
+    TAX
+    BRA_a(Check_Alive_Bosses_loop)
+Check_Alive_Bosses_end:
+    TYA
+    RTL
